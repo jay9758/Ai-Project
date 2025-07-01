@@ -1,67 +1,80 @@
-import { useEffect } from "react";
-import Navbar from "./components/Navbar";
-import { Routes, Route, Navigate } from "react-router-dom";
-import HomePage from "./pages/HomePage";
-import SignUpPage from "./pages/SignUpPage";
-import LoginPage from "./pages/LoginPage";
-import SettingsPage from "./pages/SettingsPage";
-import ProfilePage from "./pages/ProfilePage";
-import { useAuthStore } from "./store/useAuthStore";
-import { useThemeStore } from "./store/useThemeStore";
-import { Loader } from "lucide-react";
-import { Toaster } from "react-hot-toast";
+import { useState, useEffect } from "react";
+import "prismjs/themes/prism-tomorrow.css";
+import Editor from "react-simple-code-editor";
+import prism from "prismjs";
+import Markdown from "react-markdown";
+import rehypeHighlight from "rehype-highlight";
+import "highlight.js/styles/github-dark.css";
+import axios from "axios";
+import "./App.css";
 
-const App = () => {
-  const { authUser, checkAuth, isCheckingAuth, onlineUsers } = useAuthStore();
-  const { theme } = useThemeStore();
+function App() {
+  const [code, setCode] = useState(`function sum() {
+return a + b;
+}`);
 
-  // console.log({ onlineUsers });
-
-  //to make theme appear on scroll part also
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-  }, [theme]);
+  const [review, setReview] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+    prism.highlightAll();
+  }, []);
 
-  // console.log({ authUser });
-
-  if (isCheckingAuth && !authUser)
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader className="size-10 animate-spin" />
-      </div>
-    );
+  async function reviewCode() {
+    try {
+      setLoading(true);
+      const response = await axios.post("http://localhost:3000/ai/get-review", {
+        code,
+      });
+      setReview(response.data);
+    } catch (error) {
+      console.error("Review failed:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <div>
-      <Navbar />
-
-      <Routes>
-        <Route
-          path="/"
-          element={authUser ? <HomePage /> : <Navigate to="/login" />}
-        />
-        <Route
-          path="/signup"
-          element={!authUser ? <SignUpPage /> : <Navigate to="/" />}
-        />
-        <Route
-          path="/login"
-          element={!authUser ? <LoginPage /> : <Navigate to="/" />}
-        />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route
-          path="/profile"
-          element={authUser ? <ProfilePage /> : <Navigate to="/login" />}
-        />
-      </Routes>
-
-      <Toaster />
-    </div>
+    <>
+      <main>
+        <div className="left">
+          <div className="code">
+            <Editor
+              value={code}
+              onValueChange={(code) => setCode(code)}
+              highlight={(code) =>
+                prism.highlight(code, prism.languages.javascript, "javascript")
+              }
+              padding={10}
+              style={{
+                fontFamily: '"Fira code", "Fira Mono", monospace',
+                fontSize: 18,
+                border: "1px solid #ddd",
+                borderRadius: "5px",
+                height: "100%",
+                width: "100%",
+                backgroundColor: "#0c0c0c",
+                color: "#f8f8f2",
+              }}
+            />
+          </div>
+          <div
+            onClick={reviewCode}
+            className={`review ${loading ? "disabled" : ""}`}
+          >
+            {loading ? "Reviewing..." : "Review"}
+          </div>
+        </div>
+        <div className="right">
+          {loading ? (
+            <div className="spinner" />
+          ) : (
+            <Markdown rehypePlugins={[rehypeHighlight]}>{review}</Markdown>
+          )}
+        </div>
+      </main>
+    </>
   );
-};
+}
 
 export default App;
